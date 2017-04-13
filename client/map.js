@@ -157,7 +157,20 @@
     this.prefs = prefs;
 
     this.search = function(cb) {
-      // TODO: Implement this.
+      $.ajax({
+        url: 'http://localhost:5000/search',
+        type: 'GET',
+        contentType: "application/json",
+        cache: false,
+        dataType: 'json',
+        data: JSON.stringify(this.prefs),
+        error: function(jqXHR) {
+            console.log("ajax error " + jqXHR.status);
+        }
+      }).done(function(data) {
+        alert(JSON.stringify(data));
+        cb(false, data.products);
+      });
     };
   };
 
