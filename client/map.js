@@ -61,7 +61,7 @@
       var options = {minZoom: 8, maxZoom: 18};
       var map = L.mapbox.map('map', 'mapbox.streets', options);
 
-      map.setView(center, options.minZoom);
+      map.setView(center, Math.ceil((options.minZoom + options.maxZoom)/2));
       map.touchZoom.disable();
       map.doubleClickZoom.disable();
       map.scrollWheelZoom.disable();
