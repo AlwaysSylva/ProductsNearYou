@@ -163,12 +163,11 @@
         contentType: "application/json",
         cache: false,
         dataType: 'json',
-        data: JSON.stringify(this.prefs),
+        data: JSON.stringify(prefs),
         error: function(jqXHR) {
             console.log("ajax error " + jqXHR.status);
         }
       }).done(function(data) {
-        alert(JSON.stringify(data));
         cb(false, data.products);
       });
     };
