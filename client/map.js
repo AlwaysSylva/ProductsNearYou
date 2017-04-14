@@ -165,7 +165,7 @@
             radius: self.prefs.radius,
             lat: self.prefs.position.lat,
             lng: self.prefs.position.lng,
-            tags: JSON.stringify(self.prefs.tags)
+            tags: self.prefs.tags
         }
       }).done(function(data) {
         cb(data.error, data.products);

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import csv
 import sqlite3
+from math import pi, cos
 
 from flask import Blueprint, current_app, jsonify, request
 from flask_cors import cross_origin
@@ -40,13 +41,42 @@ def search():
     lng = request.args.get('lng', type=float)
     if lng is None:
         return jsonify_error('Invalid lng argument')
-    tags = request.args.get('tags', default=[], type=list)
+    tags = request.args.getlist('tags[]')
 
-    params = (count,)
+    r_earth = 6371000
+    degrees_radius = (180 / pi) * radius / r_earth
+    max_lat = lat + degrees_radius
+    min_lat = lat - degrees_radius
+    lng_degrees_radius = degrees_radius / cos(lat * pi/180)
+    max_lng = lng + lng_degrees_radius
+    min_lng = lng - lng_degrees_radius
+
+    params = tuple(tags) + (min_lat, max_lat, min_lng, max_lng, count)
+    tag_placeholders = ', '.join('?' for tag in tags)
     cursor = conn.cursor()
-    cursor.execute("SELECT p.title, p.popularity, s.lat, s.lng "
-                   "FROM  products p JOIN shops s ON p.shop_id = s.id "
-                   "LIMIT ?", params)
+    tag_query = "SELECT p.title as title, p.popularity as popularity, tagshops.lat as lat, tagshops.lng as lng " \
+                   "FROM  products p " \
+                   "JOIN (" \
+                       "SELECT s.id, s.lat, s.lng " \
+                       "FROM shops s JOIN taggings JOIN tags t " \
+                       "ON s.id = taggings.shop_id AND taggings.tag_id = t.id " \
+                       "WHERE t.tag IN ({}) " \
+                           "AND (s.lat BETWEEN ? AND ?) AND (s.lng BETWEEN ? AND ?)" \
+                   ") tagshops " \
+                   "ON p.shop_id = tagshops.id " \
+                   "ORDER BY p.popularity DESC " \
+                   "LIMIT ?".format(tag_placeholders)
+    no_tag_query = "SELECT p.title as title, p.popularity as popularity, s.lat as lat, s.lng as lng " \
+                   "FROM  products p " \
+                   "JOIN shops s " \
+                   "ON p.shop_id = s.id " \
+                   "WHERE (s.lat BETWEEN ? AND ?) AND (s.lng BETWEEN ? AND ?) " \
+                   "ORDER BY p.popularity DESC " \
+                   "LIMIT ?"
+    if tags:
+        cursor.execute(tag_query, params)
+    else:
+        cursor.execute(no_tag_query, params)
     products = map(construct_product_descriptor, cursor.fetchall())
     return jsonify({'products': products})
 
