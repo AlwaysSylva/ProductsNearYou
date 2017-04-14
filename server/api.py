@@ -7,6 +7,7 @@ from flask_cors import cross_origin
 
 api = Blueprint('api', __name__)
 
+
 def data_path(filename):
     data_path = current_app.config['DATA_PATH']
     return u"%s/%s" % (data_path, filename)
@@ -26,13 +27,13 @@ def search():
     conn.commit()
 
     request_json = request.get_json()
-    if not request_json or not 'count' in request_json or not 'radius' in request_json or not 'position' in request_json:
+    if not request_json or 'count' not in request_json or 'radius' not in request_json or 'position' not in request_json:
         return jsonify({'error': 'Missing data in request'})
     if type(request_json['count']) is not int:
         return jsonify({'error': 'Count must be provided as an integer'})
     if type(request_json['radius']) is not int:
         return jsonify({'error': 'Radius must be provided as an integer'})
-    if not 'lat' in request_json['position'] or not 'lng' in request_json['position']:
+    if 'lat' not in request_json['position'] or 'lng' not in request_json['position']:
         return jsonify({'error': 'Missing latitude or longitude in request'})
     if type(request_json['position']['lat']) is not float or type(request_json['position']['lng']) is not float:
         return jsonify({'error': 'Latitude and longitude must be provided as floating point numbers'})
