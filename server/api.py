@@ -27,21 +27,10 @@ def search():
     populate_db_table(cursor, 'taggings', data_path('taggings.csv'))
     conn.commit()
 
-    if any(key not in request.args for key in ('count', 'radius', 'lat', 'lng')):
-        return jsonify_error('Missing arguments in request')
-    count = request.args.get('count', type=int)
-    if count is None:
-        return jsonify_error('Invalid count argument')
-    radius = request.args.get('radius', type=int)
-    if radius is None:
-        return jsonify_error('Invalid radius argument')
-    lat = request.args.get('lat', type=float)
-    if lat is None:
-        return jsonify_error('Invalid lat argument')
-    lng = request.args.get('lng', type=float)
-    if lng is None:
-        return jsonify_error('Invalid lng argument')
-    tags = request.args.getlist('tags[]')
+    try:
+        count, lat, lng, radius, tags = extract_request_args(request)
+    except (TypeError, ValueError) as e:
+        return jsonify_error("Invalid request arguments: " + str(e))
 
     r_earth = 6371000
     degrees_radius = (180 / pi) * radius / r_earth
@@ -79,6 +68,25 @@ def search():
         cursor.execute(no_tag_query, params)
     products = map(construct_product_descriptor, cursor.fetchall())
     return jsonify({'products': products})
+
+
+def extract_request_args(request):
+    if any(key not in request.args for key in ('count', 'radius', 'lat', 'lng')):
+        raise TypeError('Required arguments - count, radius, lat, lng')
+    count = request.args.get('count', type=int)
+    if count is None:
+        raise ValueError('count must be an int')
+    radius = request.args.get('radius', type=int)
+    if radius is None:
+        raise ValueError('radius must be an int')
+    lat = request.args.get('lat', type=float)
+    if lat is None:
+        raise ValueError('lat must be a float')
+    lng = request.args.get('lng', type=float)
+    if lng is None:
+        raise ValueError('lng must be a float')
+    tags = request.args.getlist('tags[]')
+    return count, lat, lng, radius, tags
 
 
 def jsonify_error(message):
