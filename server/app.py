@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 
 import os
+
 from flask import Flask
+
 from server.api import api
 
 
@@ -18,7 +20,10 @@ def configure_settings(app, settings_override):
     app.config.update({
         'DEBUG': True,
         'TESTING': False,
-        'DATA_PATH': data_path
+        'DATA_PATH': data_path,
+        'DATABASE': os.path.join(app.instance_path, 'app.db'),
+        'USERNAME': 'admin',
+        'PASSWORD': 'default'
     })
     if settings_override:
         app.config.update(settings_override)

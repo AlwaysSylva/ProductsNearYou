@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
-import csv
-import sqlite3
 from math import pi, cos
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, jsonify, request, g
 from flask_cors import cross_origin
 
 TAG_QUERY = "SELECT p.title as title, p.popularity as popularity, tagshops.lat as lat, tagshops.lng as lng " \
@@ -38,16 +36,6 @@ def data_path(filename):
 @api.route('/search', methods=['GET'])
 @cross_origin(origins='http://localhost:8000')
 def search():
-    conn = sqlite3.connect(':memory:')
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    init_db(cursor)
-    populate_db_table(cursor, 'products', data_path('products.csv'))
-    populate_db_table(cursor, 'shops', data_path('shops.csv'))
-    populate_db_table(cursor, 'tags', data_path('tags.csv'))
-    populate_db_table(cursor, 'taggings', data_path('taggings.csv'))
-    conn.commit()
-
     try:
         count, lat, lng, radius, tags = extract_request_args(request)
     except (TypeError, ValueError) as e:
@@ -64,7 +52,7 @@ def search():
 
     params = tuple(tags) + (min_lat, max_lat, min_lng, max_lng, count)
     tag_placeholders = ', '.join('?' for tag in tags)
-    cursor = conn.cursor()
+    cursor = g.db.cursor()
     if tags:
         cursor.execute(TAG_QUERY.format(tag_placeholders), params)
     else:
@@ -106,47 +94,3 @@ def construct_product_descriptor(row):
         }
     }
     return product
-
-
-def init_db(cursor):
-    cursor.execute('''CREATE TABLE products (
-        id TEXT,
-        shop_id TEXT,
-        title TEXT,
-        popularity REAL,
-        quantity INTEGER
-        )''')
-    cursor.execute('''CREATE TABLE shops (
-        id TEXT,
-        name TEXT,
-        lat REAL,
-        lng REAL
-        )''')
-    cursor.execute('''CREATE TABLE tags (
-        id TEXT,
-        tag TEXT
-        )''')
-    cursor.execute('''CREATE TABLE taggings (
-        product_id TEXT,
-        shop_id TEXT,
-        tag_id TEXT
-        )''')
-
-
-INSERT_STATEMENTS = {
-    'products': '''INSERT INTO products (id, shop_id, title, popularity, quantity) VALUES (?, ?, ?, ?, ?)''',
-    'shops': '''INSERT INTO shops (id, name, lat, lng) VALUES (?, ?, ?, ?)''',
-    'tags': '''INSERT INTO tags (id, tag) VALUES (?, ?)''',
-    'taggings': '''INSERT INTO taggings (product_id, shop_id, tag_id) VALUES (?, ?, ?)'''
-}
-
-
-def unicode_csv_reader(utf8_data):
-    csv_reader = csv.reader(utf8_data)
-    for row in csv_reader:
-        yield [unicode(cell, 'utf-8') for cell in row]
-
-
-def populate_db_table(cursor, table, csv_path):
-    reader = unicode_csv_reader(open(csv_path))
-    cursor.executemany(INSERT_STATEMENTS.get(table), reader)
