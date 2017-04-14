@@ -159,10 +159,14 @@
     this.search = function(cb) {
       $.ajax({
         url: 'http://localhost:5000/search',
-        type: 'POST',
-        cache: false,
-        contentType: "application/json",
-        data: JSON.stringify(self.prefs)
+        type: 'GET',
+        data: {
+            count: self.prefs.count,
+            radius: self.prefs.radius,
+            lat: self.prefs.position.lat,
+            lng: self.prefs.position.lng,
+            tags: JSON.stringify(self.prefs.tags)
+        }
       }).done(function(data) {
         cb(data.error, data.products);
       });
