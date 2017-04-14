@@ -6,6 +6,27 @@ from math import pi, cos
 from flask import Blueprint, current_app, jsonify, request
 from flask_cors import cross_origin
 
+TAG_QUERY = "SELECT p.title as title, p.popularity as popularity, tagshops.lat as lat, tagshops.lng as lng " \
+            "FROM  products p " \
+            "JOIN (" \
+            "SELECT s.id, s.lat, s.lng " \
+            "FROM shops s JOIN taggings JOIN tags t " \
+            "ON s.id = taggings.shop_id AND taggings.tag_id = t.id " \
+            "WHERE t.tag IN ({}) " \
+            "AND (s.lat BETWEEN ? AND ?) AND (s.lng BETWEEN ? AND ?)" \
+            ") tagshops " \
+            "ON p.shop_id = tagshops.id " \
+            "ORDER BY p.popularity DESC " \
+            "LIMIT ?"
+
+NO_TAG_QUERY = "SELECT p.title as title, p.popularity as popularity, s.lat as lat, s.lng as lng " \
+               "FROM  products p " \
+               "JOIN shops s " \
+               "ON p.shop_id = s.id " \
+               "WHERE (s.lat BETWEEN ? AND ?) AND (s.lng BETWEEN ? AND ?) " \
+               "ORDER BY p.popularity DESC " \
+               "LIMIT ?"
+
 api = Blueprint('api', __name__)
 
 
@@ -32,40 +53,22 @@ def search():
     except (TypeError, ValueError) as e:
         return jsonify_error("Invalid request arguments: " + str(e))
 
+    # Calculate approximation of min/max for lat & lng with given radius
     r_earth = 6371000
     degrees_radius = (180 / pi) * radius / r_earth
     max_lat = lat + degrees_radius
     min_lat = lat - degrees_radius
-    lng_degrees_radius = degrees_radius / cos(lat * pi/180)
+    lng_degrees_radius = degrees_radius / cos(lat * pi / 180)
     max_lng = lng + lng_degrees_radius
     min_lng = lng - lng_degrees_radius
 
     params = tuple(tags) + (min_lat, max_lat, min_lng, max_lng, count)
     tag_placeholders = ', '.join('?' for tag in tags)
     cursor = conn.cursor()
-    tag_query = "SELECT p.title as title, p.popularity as popularity, tagshops.lat as lat, tagshops.lng as lng " \
-                   "FROM  products p " \
-                   "JOIN (" \
-                       "SELECT s.id, s.lat, s.lng " \
-                       "FROM shops s JOIN taggings JOIN tags t " \
-                       "ON s.id = taggings.shop_id AND taggings.tag_id = t.id " \
-                       "WHERE t.tag IN ({}) " \
-                           "AND (s.lat BETWEEN ? AND ?) AND (s.lng BETWEEN ? AND ?)" \
-                   ") tagshops " \
-                   "ON p.shop_id = tagshops.id " \
-                   "ORDER BY p.popularity DESC " \
-                   "LIMIT ?".format(tag_placeholders)
-    no_tag_query = "SELECT p.title as title, p.popularity as popularity, s.lat as lat, s.lng as lng " \
-                   "FROM  products p " \
-                   "JOIN shops s " \
-                   "ON p.shop_id = s.id " \
-                   "WHERE (s.lat BETWEEN ? AND ?) AND (s.lng BETWEEN ? AND ?) " \
-                   "ORDER BY p.popularity DESC " \
-                   "LIMIT ?"
     if tags:
-        cursor.execute(tag_query, params)
+        cursor.execute(TAG_QUERY.format(tag_placeholders), params)
     else:
-        cursor.execute(no_tag_query, params)
+        cursor.execute(NO_TAG_QUERY, params)
     products = map(construct_product_descriptor, cursor.fetchall())
     return jsonify({'products': products})
 
