@@ -159,16 +159,12 @@
     this.search = function(cb) {
       $.ajax({
         url: 'http://localhost:5000/search',
-        type: 'GET',
-        contentType: "application/json",
+        type: 'POST',
         cache: false,
-        dataType: 'json',
-        data: JSON.stringify(prefs),
-        error: function(jqXHR) {
-            console.log("ajax error " + jqXHR.status);
-        }
+        contentType: "application/json",
+        data: JSON.stringify(self.prefs)
       }).done(function(data) {
-        cb(false, data.products);
+        cb(data.error, data.products);
       });
     };
   };

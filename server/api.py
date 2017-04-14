@@ -7,13 +7,12 @@ from flask_cors import cross_origin
 
 api = Blueprint('api', __name__)
 
-
 def data_path(filename):
     data_path = current_app.config['DATA_PATH']
     return u"%s/%s" % (data_path, filename)
 
 
-@api.route('/search', methods=['GET'])
+@api.route('/search', methods=['POST'])
 @cross_origin(origins='http://localhost:8000')
 def search():
     conn = sqlite3.connect(':memory:')
@@ -26,10 +25,25 @@ def search():
     populate_db_table(cursor, 'taggings', data_path('taggings.csv'))
     conn.commit()
 
+    request_json = request.get_json()
+    if not request_json or not 'count' in request_json or not 'radius' in request_json or not 'position' in request_json:
+        return jsonify({'error': 'Missing data in request'})
+    if type(request_json['count']) is not int:
+        return jsonify({'error': 'Count must be provided as an integer'})
+    if type(request_json['radius']) is not int:
+        return jsonify({'error': 'Radius must be provided as an integer'})
+    if not 'lat' in request_json['position'] or not 'lng' in request_json['position']:
+        return jsonify({'error': 'Missing latitude or longitude in request'})
+    if type(request_json['position']['lat']) is not float or type(request_json['position']['lng']) is not float:
+        return jsonify({'error': 'Latitude and longitude must be provided as floating point numbers'})
+    if 'tags' in request_json and type(request_json['tags']) is not list:
+        return jsonify({'error': 'Tags much be provide as a list'})
+
+    params = (request_json['count'],)
     cursor = conn.cursor()
     cursor.execute("SELECT p.title, p.popularity, s.lat, s.lng "
                    "FROM  products p JOIN shops s ON p.shop_id = s.id "
-                   "LIMIT 10")
+                   "LIMIT ?", params)
     products = map(construct_product_descriptor, cursor.fetchall())
     return jsonify({'products': products})
 
