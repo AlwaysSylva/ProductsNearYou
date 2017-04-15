@@ -3,6 +3,7 @@ from math import pi, cos
 
 from flask import Blueprint, current_app, jsonify, request, g
 from flask_cors import cross_origin
+from geopy.distance import great_circle
 
 TAG_QUERY = "SELECT p.title as title, p.popularity as popularity, tagshops.lat as lat, tagshops.lng as lng " \
             "FROM  products p " \
@@ -13,17 +14,13 @@ TAG_QUERY = "SELECT p.title as title, p.popularity as popularity, tagshops.lat a
             "WHERE t.tag IN ({}) " \
             "AND (s.lat BETWEEN ? AND ?) AND (s.lng BETWEEN ? AND ?)" \
             ") tagshops " \
-            "ON p.shop_id = tagshops.id " \
-            "ORDER BY p.popularity DESC " \
-            "LIMIT ?"
+            "ON p.shop_id = tagshops.id"
 
 NO_TAG_QUERY = "SELECT p.title as title, p.popularity as popularity, s.lat as lat, s.lng as lng " \
                "FROM  products p " \
                "JOIN shops s " \
                "ON p.shop_id = s.id " \
-               "WHERE (s.lat BETWEEN ? AND ?) AND (s.lng BETWEEN ? AND ?) " \
-               "ORDER BY p.popularity DESC " \
-               "LIMIT ?"
+               "WHERE (s.lat BETWEEN ? AND ?) AND (s.lng BETWEEN ? AND ?)"
 
 api = Blueprint('api', __name__)
 
@@ -50,15 +47,18 @@ def search():
     max_lng = lng + lng_degrees_radius
     min_lng = lng - lng_degrees_radius
 
-    params = tuple(tags) + (min_lat, max_lat, min_lng, max_lng, count)
+    params = tuple(tags) + (min_lat, max_lat, min_lng, max_lng)
     tag_placeholders = ', '.join('?' for tag in tags)
     cursor = g.db.cursor()
     if tags:
         cursor.execute(TAG_QUERY.format(tag_placeholders), params)
     else:
         cursor.execute(NO_TAG_QUERY, params)
-    products = map(construct_product_descriptor, cursor.fetchall())
-    return jsonify({'products': products})
+
+    products_in_radius = [row for row in cursor.fetchall() if within_radius(row, (lat, lng), radius)]
+    sorted_products = sorted(products_in_radius, key=lambda k: k['popularity'], reverse=True)
+    top_products = map(construct_product_dict, sorted_products[:count])
+    return jsonify({'products': top_products})
 
 
 def extract_request_args(request):
@@ -84,7 +84,11 @@ def jsonify_error(message):
     return jsonify({'error': message})
 
 
-def construct_product_descriptor(row):
+def within_radius(row, position, radius):
+    return great_circle(position, (row['lat'], row['lng'])).meters < radius
+
+
+def construct_product_dict(row):
     product = {
         'title': row['title'],
         'popularity': row['popularity'],
