@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 
-import json
 import functools
+import json
 import os
 import sys
 
 import pytest
 from flask import Flask
+
+from runserver import init_db
 
 # Set up the path to import from `server`.
 root = os.path.join(os.path.dirname(__file__))
@@ -59,6 +61,8 @@ def app(request):
     # Establish an application context before running the tests.
     ctx = app.app_context()
     ctx.push()
+
+    init_db()
 
     def teardown():
         ctx.pop()
