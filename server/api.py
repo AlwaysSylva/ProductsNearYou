@@ -33,12 +33,14 @@ def data_path(filename):
 @api.route('/search', methods=['GET'])
 @cross_origin(origins='http://localhost:8000')
 def search():
+    # Validate and extract arguments from the request
     try:
         count, lat, lng, radius, tags = extract_request_args(request)
     except (TypeError, ValueError) as e:
         return jsonify_error("Invalid request arguments: " + str(e))
 
-    # Calculate approximation of min/max for lat & lng with given radius
+    # Calculate approximation of min/max for latitude & longitude with given radius
+    # This will be used to identify products in a square (2*radius square) around the given position
     r_earth = 6371000
     degrees_radius = (180 / pi) * radius / r_earth
     max_lat = lat + degrees_radius
@@ -47,6 +49,7 @@ def search():
     max_lng = lng + lng_degrees_radius
     min_lng = lng - lng_degrees_radius
 
+    # Construct and execute SQLite query returning products from shops with suitable tags in square area
     params = tuple(tags) + (min_lat, max_lat, min_lng, max_lng)
     tag_placeholders = ', '.join('?' for tag in tags)
     cursor = g.db.cursor()
@@ -55,13 +58,31 @@ def search():
     else:
         cursor.execute(NO_TAG_QUERY, params)
 
+    # Reduce set of products to those within circular area around the given position
     products_in_radius = [row for row in cursor.fetchall() if within_radius(row, (lat, lng), radius)]
+
+    # Sort list of products by popularity
     sorted_products = sorted(products_in_radius, key=lambda k: k['popularity'], reverse=True)
+
+    # Convert the top n products to dict format ready and return as json message
     top_products = map(construct_product_dict, sorted_products[:count])
     return jsonify({'products': top_products})
 
 
 def extract_request_args(request):
+    '''Extract arguments from the request
+    
+    Arguments extracted are:\n
+    count (int) *required*\n
+    radius (int) *required*\n
+    lat (float) *required*\n
+    lng (float) *required*\n
+    tags (list)\n
+    If any *required* argument is missing, or any argument is not provided as the expected type a :ValueError: is raised
+    
+    :param request:
+    :return: Returns extracted arguments; count, lat, lng, radius & tags
+    '''
     if any(key not in request.args for key in ('count', 'radius', 'lat', 'lng')):
         raise TypeError('Required arguments - count, radius, lat, lng')
     count = request.args.get('count', type=int)
@@ -89,7 +110,7 @@ def within_radius(row, position, radius):
 
 
 def construct_product_dict(row):
-    product = {
+    return {
         'title': row['title'],
         'popularity': row['popularity'],
         'shop': {
@@ -97,4 +118,3 @@ def construct_product_dict(row):
             'lng': row['lng']
         }
     }
-    return product

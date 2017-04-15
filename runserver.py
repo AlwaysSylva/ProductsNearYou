@@ -23,6 +23,7 @@ def data_path(filename):
 
 
 def init_db():
+    '''Create database schema and load data from CSV files'''
     with closing(connect_db()) as db:
         cursor = db.cursor()
         with app.open_resource(data_path('schema.sql'), mode='r') as f:
