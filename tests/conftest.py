@@ -6,9 +6,9 @@ import os
 import sys
 
 import pytest
-from flask import Flask
+from flask import Flask, g
 
-from runserver import init_db
+from runserver import init_db, connect_db
 
 # Set up the path to import from `server`.
 root = os.path.join(os.path.dirname(__file__))
@@ -57,6 +57,20 @@ def app(request):
     app = create_app({
         'TESTING': True
     })
+
+    @app.before_request
+    def get_db():
+        """Opens a new database connection if there is none yet for the
+        current application context.
+        """
+        if not hasattr(g, 'db'):
+            g.db = connect_db()
+
+    @app.teardown_appcontext
+    def close_db(error):
+        """Closes the database again at the end of the request."""
+        if hasattr(g, 'db'):
+            g.db.close()
 
     # Establish an application context before running the tests.
     ctx = app.app_context()

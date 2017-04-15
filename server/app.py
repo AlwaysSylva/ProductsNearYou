@@ -21,9 +21,7 @@ def configure_settings(app, settings_override):
         'DEBUG': True,
         'TESTING': False,
         'DATA_PATH': data_path,
-        'DATABASE': os.path.join(app.instance_path, 'app.db'),
-        'USERNAME': 'admin',
-        'PASSWORD': 'default'
+        'DATABASE': os.path.join(app.instance_path, 'app.db')
     })
     if settings_override:
         app.config.update(settings_override)
